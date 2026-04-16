@@ -53,7 +53,7 @@ jobs:
   # Stage 1: SonarQube Code Quality Analysis
 
   sonarqube:
-    uses: Medimesh-grp3/ci-templates/.github/workflows/template-sonarqube.yml@main
+    uses: Medimesh-grp3/template-ci/.github/workflows/template-sonarqube.yml@main
     with:
       service_name: medimesh-ambulance
       service_path: .
@@ -70,7 +70,7 @@ jobs:
 
   build-snyk:
     needs: sonarqube
-    uses: Medimesh-grp3/ci-templates/.github/workflows/template-build-snyk.yml@main
+    uses: Medimesh-grp3/template-ci/.github/workflows/template-build-snyk.yml@main
     with:
       service_name: medimesh-ambulance
       service_path: .
@@ -86,7 +86,7 @@ jobs:
 
   docker:
     needs: build-snyk
-    uses: Medimesh-grp3/ci-templates/.github/workflows/template-docker.yml@main
+    uses: Medimesh-grp3/template-ci/.github/workflows/template-docker.yml@main
     with:
       service_name:      medimesh-ambulance
       service_path:      .
@@ -104,7 +104,7 @@ jobs:
   deploy:
     needs: docker
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    uses: Medimesh-grp3/ci-templates/.github/workflows/template-cd.yml@main
+    uses: Medimesh-grp3/template-ci/.github/workflows/template-cd.yml@main
     with:
       service_name: medimesh-ambulance
       values_key:   ambulance
@@ -116,7 +116,7 @@ jobs:
       ALERT_EMAIL:       ${{ secrets.ALERT_EMAIL }}
 
 
-  #Final: Success notification
+  # Final: Success notification
   notify-success:
     name: "✅ Pipeline Complete — medimesh-ambulance"
     runs-on: ubuntu-latest
