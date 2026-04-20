@@ -4,7 +4,7 @@ const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Get all ambulances (any authenticated user)
+// Get all ambulances (any authenticated users)
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const ambulances = await Ambulance.find().sort({ status: 1, vehicleNumber: 1 });
