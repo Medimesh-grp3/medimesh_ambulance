@@ -1,168 +1,3 @@
-# name: "CI — medimesh-ambulance"
-#
-# on:
-#   push:
-#     branches: [main, feature/ci-pipeline-v3]
-#     paths:
-#       - "services/medimesh-ambulance/**"
-#       - ".github/workflows/ci-medimesh-ambulance.yml"
-#       - ".github/workflows/template-ci.yml"
-#   pull_request:
-#     branches: [main]
-#     paths:
-#       - "services/medimesh-ambulance/**"
-#       - ".github/workflows/ci-medimesh-ambulance.yml"
-#       - ".github/workflows/template-ci.yml"
-
-# permissions:
-#   contents: write
-
-# jobs:
-#   call-template:
-#     uses: ./.github/workflows/template-ci.yml
-#     with:
-#       service_name: medimesh-ambulance
-#       service_path: services/medimesh-ambulance
-#       docker_image_name: medimesh_medimesh-ambulance
-#       sonar_project_key: medimesh-ambulance
-#       node_version: "20"
-#     secrets:
-#       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-#       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-#       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-#       SONARQUBE_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
-#       SONARQUBE_URL: ${{ secrets.SONARQUBE_URL }}
-#       SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-#       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-#       ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
-
-
-# name: "CI/CD — medimesh-ambulance"
-# run-name: "medimesh-ambulance — ${{ github.event.head_commit.message }} (${{ github.sha }})"
-
-# on:
-#   push:
-#     branches: [main]
-#   pull_request:
-#     branches: [main]
-
-# permissions:
-#   contents: write
-
-# jobs:
-#   # Stage 1: SonarQube Code Quality Analysis
-
-#   sonarqube:
-#     uses: Medimesh-grp3/template-ci/.github/workflows/template-sonarqube.yml@main
-#     with:
-#       service_name: medimesh-ambulance
-#       service_path: .
-#       sonar_project_key: medimesh-ambulance
-#     secrets:
-#       SONARQUBE_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
-#       SONARQUBE_URL:   ${{ secrets.SONARQUBE_URL }}
-#       SMTP_USERNAME:   ${{ secrets.SMTP_USERNAME }}
-#       SMTP_PASSWORD:   ${{ secrets.SMTP_PASSWORD }}
-#       ALERT_EMAIL:     ${{ secrets.ALERT_EMAIL }}
-
-
-#   # Stage 2: Build Dependencies & Snyk Security Scan
-
-#   build-snyk:
-#     needs: sonarqube
-#     uses: Medimesh-grp3/template-ci/.github/workflows/template-build-snyk.yml@main
-#     with:
-#       service_name: medimesh-ambulance
-#       service_path: .
-#       node_version: "20"
-#     secrets:
-#       SNYK_TOKEN:    ${{ secrets.SNYK_TOKEN }}
-#       SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-#       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-#       ALERT_EMAIL:   ${{ secrets.ALERT_EMAIL }}
-
-
-#   # Stage 3: Docker Build + Trivy Scan + Push to DockerHub
-
-#   docker:
-#     needs: build-snyk
-#     uses: Medimesh-grp3/template-ci/.github/workflows/template-docker.yml@main
-#     with:
-#       service_name:      medimesh-ambulance
-#       service_path:      .
-#       docker_image_name: medimesh_medimesh-ambulance
-#     secrets:
-#       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-#       DOCKERHUB_TOKEN:    ${{ secrets.DOCKERHUB_TOKEN }}
-#       SMTP_USERNAME:      ${{ secrets.SMTP_USERNAME }}
-#       SMTP_PASSWORD:      ${{ secrets.SMTP_PASSWORD }}
-#       ALERT_EMAIL:        ${{ secrets.ALERT_EMAIL }}
-
-
-#   # Stage 4: CD — Update ArgoCD repo → ArgoCD auto-deploys
-
-#   deploy:
-#     needs: docker
-#     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-#     uses: Medimesh-grp3/template-ci/.github/workflows/template-cd.yml@main
-#     with:
-#       service_name: medimesh-ambulance
-#       values_key:   ambulance
-#       image_tag:    ${{ needs.docker.outputs.version }}
-#     secrets:
-#       MANIFEST_REPO_PAT: ${{ secrets.MANIFEST_REPO_PAT }}
-#       SMTP_USERNAME:     ${{ secrets.SMTP_USERNAME }}
-#       SMTP_PASSWORD:     ${{ secrets.SMTP_PASSWORD }}
-#       ALERT_EMAIL:       ${{ secrets.ALERT_EMAIL }}
-
-
-#   # Final:Success notification
-#   notify-success:
-#     name: "✅ Pipeline Complete — medimesh-ambulance"
-#     runs-on: ubuntu-latest
-#     needs: [sonarqube, build-snyk, docker, deploy]
-#     if: |
-#       always() &&
-#       needs.docker.result == 'success' &&
-#       github.event_name != 'pull_request'
-#     steps:
-#       - name: Send Success Email
-#         uses: dawidd6/action-send-mail@v3
-#         with:
-#           server_address: smtp.gmail.com
-#           server_port: 465
-#           username: ${{ secrets.SMTP_USERNAME }}
-#           password: ${{ secrets.SMTP_PASSWORD }}
-#           subject: "✅ MediMesh CI/CD Passed — medimesh-ambulance (${{ needs.docker.outputs.version }})"
-#           to: ${{ secrets.ALERT_EMAIL }}
-#           from: MediMesh CI/CD Pipeline
-#           body: |
-#             ════════════════════════════════════════════════════════
-#             ✅ MediMesh CI/CD Pipeline — ALL STAGES PASSED
-#             ════════════════════════════════════════════════════════
-#             Service : medimesh-ambulance
-#             Version : ${{ needs.docker.outputs.version }}
-#             Branch  : ${{ github.ref_name }}
-#             Commit  : ${{ github.sha }}
-#             Author  : ${{ github.actor }}
-#             ────────────────────────────────────────────────────────
-#             ✅ ① SonarQube — Code quality passed
-#             ✅ ② Build     — Dependencies installed
-#             ✅ ③ Snyk      — Security scan done
-#             ✅ ④ Docker    — Image built
-#             ✅ ⑤ Trivy     — Container scanned
-#             ✅ ⑥ Push      — Image on DockerHub
-#             ✅ ⑦ CD        — ArgoCD manifest updated
-#             ────────────────────────────────────────────────────────
-#             Image: ${{ secrets.DOCKERHUB_USERNAME }}/medimesh_medimesh-ambulance:${{ needs.docker.outputs.version }}
-#             ArgoCD is now deploying to cluster automatically.
-#             Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-#             ════════════════════════════════════════════════════════
-
-
-
-# medimesh_ambulance/.github/workflows/ci-medimesh-ambulance.yml
-
 name: "CI/CD — medimesh-ambulance"
 run-name: "medimesh-ambulance — ${{ github.event.head_commit.message }} (${{ github.sha }})"
 
@@ -177,9 +12,7 @@ permissions:
 
 jobs:
 
-  # ──────────────────────────────────────────────────────────
   # Stage 1: SonarQube Code Quality Analysis
-  # ──────────────────────────────────────────────────────────
   sonarqube:
     uses: Medimesh-grp3/template-ci/.github/workflows/template-sonarqube.yml@main
     with:
@@ -193,9 +26,7 @@ jobs:
       SMTP_PASSWORD:   ${{ secrets.SMTP_PASSWORD }}
       ALERT_EMAIL:     ${{ secrets.ALERT_EMAIL }}
 
-  # ──────────────────────────────────────────────────────────
   # Stage 2: Build Dependencies & Snyk Security Scan
-  # ──────────────────────────────────────────────────────────
   build-snyk:
     needs: sonarqube
     uses: Medimesh-grp3/template-ci/.github/workflows/template-build-snyk.yml@main
@@ -209,9 +40,7 @@ jobs:
       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
       ALERT_EMAIL:   ${{ secrets.ALERT_EMAIL }}
 
-  # ──────────────────────────────────────────────────────────
   # Stage 3: Docker Build + Trivy Scan + Push to DockerHub
-  # ──────────────────────────────────────────────────────────
   docker:
     needs: build-snyk
     uses: Medimesh-grp3/template-ci/.github/workflows/template-docker.yml@main
@@ -226,9 +55,7 @@ jobs:
       SMTP_PASSWORD:      ${{ secrets.SMTP_PASSWORD }}
       ALERT_EMAIL:        ${{ secrets.ALERT_EMAIL }}
 
-  # ──────────────────────────────────────────────────────────
   # Stage 4: Approval Gate — Pauses for Human Approval
-  # ──────────────────────────────────────────────────────────
   approval:
     needs: docker
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -242,9 +69,7 @@ jobs:
       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
       ALERT_EMAIL:   ${{ secrets.ALERT_EMAIL }}
 
-  # ──────────────────────────────────────────────────────────
   # Stage 5: CD — Update ArgoCD Manifest (runs after approval)
-  # ──────────────────────────────────────────────────────────
   deploy:
     needs: [docker, approval]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -259,9 +84,7 @@ jobs:
       SMTP_PASSWORD:     ${{ secrets.SMTP_PASSWORD }}
       ALERT_EMAIL:       ${{ secrets.ALERT_EMAIL }}
 
-  # ──────────────────────────────────────────────────────────
   # Final: Success Notification
-  # ──────────────────────────────────────────────────────────
   notify-success:
     name: "✅ Pipeline Complete — medimesh-ambulance"
     runs-on: ubuntu-latest
@@ -304,94 +127,3 @@ jobs:
             ArgoCD is now deploying to cluster automatically.
             Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
             ════════════════════════════════════════════════════════
-
-
-
-# name: "CI/CD — medimesh-ambulance"
-
-# on:
-#   push:
-#     branches: [main]
-#   pull_request:
-#     branches: [main]
-
-# permissions:
-#   contents: write
-
-# jobs:
-
-#   sonarqube:
-#     uses: Medimesh-grp3/template-ci/.github/workflows/template-sonarqube.yml@main
-#     with:
-#       service_name: medimesh-ambulance
-#       service_path: .
-#       sonar_project_key: medimesh-ambulance
-#     secrets:
-#       SONARQUBE_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
-#       SONARQUBE_URL:   ${{ secrets.SONARQUBE_URL }}
-#       SMTP_USERNAME:   ${{ secrets.SMTP_USERNAME }}
-#       SMTP_PASSWORD:   ${{ secrets.SMTP_PASSWORD }}
-#       ALERT_EMAIL:     ${{ secrets.ALERT_EMAIL }}
-
-#   build-snyk:
-#     needs: sonarqube
-#     uses: Medimesh-grp3/template-ci/.github/workflows/template-build-snyk.yml@main
-#     with:
-#       service_name: medimesh-ambulance
-#       service_path: .
-#       node_version: "20"
-#     secrets:
-#       SNYK_TOKEN:    ${{ secrets.SNYK_TOKEN }}
-#       SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-#       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-#       ALERT_EMAIL:   ${{ secrets.ALERT_EMAIL }}
-
-#   docker:
-#     needs: build-snyk
-#     uses: Medimesh-grp3/template-ci/.github/workflows/template-docker.yml@main
-#     with:
-#       service_name:      medimesh-ambulance
-#       service_path:      .
-#       docker_image_name: medimesh_medimesh-ambulance
-#     secrets:
-#       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-#       DOCKERHUB_TOKEN:    ${{ secrets.DOCKERHUB_TOKEN }}
-#       SMTP_USERNAME:      ${{ secrets.SMTP_USERNAME }}
-#       SMTP_PASSWORD:      ${{ secrets.SMTP_PASSWORD }}
-#       ALERT_EMAIL:        ${{ secrets.ALERT_EMAIL }}
-
-#   deploy:
-#     needs: docker
-#     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-#     uses: Medimesh-grp3/template-ci/.github/workflows/template-cd.yml@main
-#     with:
-#       service_name: medimesh-ambulance
-#       values_key:   ambulance
-#       image_tag:    ${{ needs.docker.outputs.version }}
-#     secrets:
-#       MANIFEST_REPO_PAT: ${{ secrets.MANIFEST_REPO_PAT }}
-#       SMTP_USERNAME:     ${{ secrets.SMTP_USERNAME }}
-#       SMTP_PASSWORD:     ${{ secrets.SMTP_PASSWORD }}
-#       ALERT_EMAIL:       ${{ secrets.ALERT_EMAIL }}
-
-#   notify-success:
-#     name: "✅ Pipeline Complete — medimesh-ambulance"
-#     runs-on: ubuntu-latest
-#     needs: [sonarqube, build-snyk, docker, deploy]
-#     if: |
-#       always() &&
-#       needs.docker.result == 'success' &&
-#       github.event_name != 'pull_request'
-#     steps:
-#       - name: Send Success Email
-#         uses: dawidd6/action-send-mail@v3
-#         with:
-#           server_address: smtp.gmail.com
-#           server_port: 465
-#           username: ${{ secrets.SMTP_USERNAME }}
-#           password: ${{ secrets.SMTP_PASSWORD }}
-#           subject: "✅ MediMesh CI/CD Passed — medimesh-ambulance"
-#           to: ${{ secrets.ALERT_EMAIL }}
-#           from: MediMesh CI/CD Pipeline
-#           body: |
-#             Pipeline passed for medimesh-ambulance
